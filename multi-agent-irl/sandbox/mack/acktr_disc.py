@@ -97,8 +97,8 @@ class Model(object):
                 tf.pow(train_model[k].vf - tf.stop_gradient(sample_net[k]), 2)))
             joint_fisher_loss.append(pg_fisher_loss[k] + vf_fisher_loss[k])
 
-        self.policy_params = [] # [find_trainable_variables("policy_%d" % k) for k in range(num_agents)]
-        self.value_params = [] # [find_trainable_variables('value_%d' % k) for k in range(num_agents)]
+        self.policy_params = []  # [find_trainable_variables("policy_%d" % k) for k in range(num_agents)]
+        self.value_params = []  # [find_trainable_variables('value_%d' % k) for k in range(num_agents)]
 
         for k in range(num_agents):
             if identical[k]:
@@ -135,27 +135,26 @@ class Model(object):
                     clone_op.append(clone_op[-1])
                 else:
                     with tf.variable_scope('optim_%d' % k):
-                        optim.append(kfac.KfacOptimizer(
-                            learning_rate=PG_LR[k], clip_kl=kfac_clip,
-                            momentum=0.9, kfac_update=1, epsilon=0.01,
-                            stats_decay=0.99, async=0, cold_iter=10,
-                            max_grad_norm=max_grad_norm)
-                        )
-                        update_stats_op.append(optim[k].compute_and_apply_stats(joint_fisher_loss[k], var_list=params[k]))
+                        optim1 = kfac.KfacOptimizer(
+                            learning_rate=PG_LR[k], clip_kl=kfac_clip, kfac_update=1, cold_iter=10, stats_decay=0.99, max_grad_norm=max_grad_norm)
+
+                        optim.append(optim1)
+                        update_stats_op.append(
+                            optim[k].compute_and_apply_stats(joint_fisher_loss[k], var_list=params[k]))
                         train_op_, q_runner_ = optim[k].apply_gradients(list(zip(grads[k], params[k])))
                         train_op.append(train_op_)
                         q_runner.append(q_runner_)
 
                     with tf.variable_scope('clone_%d' % k):
-                        clones.append(kfac.KfacOptimizer(
-                            learning_rate=PG_LR[k], clip_kl=kfac_clip,
-                            momentum=0.9, kfac_update=1, epsilon=0.01,
-                            stats_decay=0.99, async=1, cold_iter=10,
+                        optim2 = kfac.KfacOptimizer(
+                            learning_rate=PG_LR[k], clip_kl=kfac_clip, kfac_update=1, cold_iter=10, stats_decay=0.99,
                             max_grad_norm=max_grad_norm)
-                        )
+
+                        clones.append(optim2)
                         update_stats_op.append(clones[k].compute_and_apply_stats(
                             pg_fisher_loss[k], var_list=self.policy_params[k]))
-                        clone_op_, q_runner_ = clones[k].apply_gradients(list(zip(clone_grads[k], self.policy_params[k])))
+                        clone_op_, q_runner_ = clones[k].apply_gradients(
+                            list(zip(clone_grads[k], self.policy_params[k])))
                         clone_op.append(clone_op_)
 
         update_stats_op = tf.group(*update_stats_op)
@@ -184,7 +183,7 @@ class Model(object):
                     action_v = []
                     for j in range(k, pointer[k]):
                         action_v.append(np.concatenate([multionehot(actions[i], self.n_actions[i])
-                                                   for i in range(num_agents) if i != k], axis=1))
+                                                        for i in range(num_agents) if i != k], axis=1))
                     action_v = np.concatenate(action_v, axis=0)
                     new_map.update({train_model[k].A_v: action_v})
                     td_map.update({train_model[k].A_v: action_v})
@@ -305,7 +304,7 @@ class Runner(object):
             np.zeros((nenv, nstack * env.observation_space[k].shape[0])) for k in range(self.num_agents)
         ]
         self.actions = [
-            np.zeros((nenv, )) for k in range(self.num_agents)
+            np.zeros((nenv,)) for k in range(self.num_agents)
         ]
         obs = env.reset()
         self.update_obs(obs)
@@ -423,9 +422,9 @@ def learn(policy, env, seed, total_timesteps=int(40e6), gamma=0.95, lam=0.92, lo
     ob_space = env.observation_space
     ac_space = env.action_space
     make_model = lambda: Model(policy, ob_space, ac_space, nenvs, total_timesteps, nprocs=nprocs, nsteps
-                                =nsteps, nstack=nstack, ent_coef=ent_coef, vf_coef=vf_coef, vf_fisher_coef=
-                                vf_fisher_coef, lr=lr, max_grad_norm=max_grad_norm, kfac_clip=kfac_clip,
-                                lrschedule=lrschedule, identical=identical)
+    =nsteps, nstack=nstack, ent_coef=ent_coef, vf_coef=vf_coef, vf_fisher_coef=
+                               vf_fisher_coef, lr=lr, max_grad_norm=max_grad_norm, kfac_clip=kfac_clip,
+                               lrschedule=lrschedule, identical=identical)
     if save_interval and logger.get_dir():
         import cloudpickle
         with open(osp.join(logger.get_dir(), 'make_model.pkl'), 'wb') as fh:
@@ -433,11 +432,11 @@ def learn(policy, env, seed, total_timesteps=int(40e6), gamma=0.95, lam=0.92, lo
     model = make_model()
 
     runner = Runner(env, model, nsteps=nsteps, nstack=nstack, gamma=gamma, lam=lam)
-    nbatch = nenvs*nsteps
+    nbatch = nenvs * nsteps
     tstart = time.time()
     coord = tf.train.Coordinator()
     # enqueue_threads = [q_runner.create_threads(model.sess, coord=coord, start=True) for q_runner in model.q_runner]
-    for update in range(1, total_timesteps//nbatch+1):
+    for update in range(1, total_timesteps // nbatch + 1):
         obs, states, rewards, masks, actions, values = runner.run()
         policy_loss, value_loss, policy_entropy = model.train(obs, states, rewards, masks, actions, values)
         model.old_obs = obs
@@ -446,7 +445,7 @@ def learn(policy, env, seed, total_timesteps=int(40e6), gamma=0.95, lam=0.92, lo
         if update % log_interval == 0 or update == 1:
             ev = [explained_variance(values[k], rewards[k]) for k in range(model.num_agents)]
             logger.record_tabular("nupdates", update)
-            logger.record_tabular("total_timesteps", update*nbatch)
+            logger.record_tabular("total_timesteps", update * nbatch)
             logger.record_tabular("fps", fps)
 
             for k in range(model.num_agents):

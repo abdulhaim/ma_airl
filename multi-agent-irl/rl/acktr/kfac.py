@@ -10,7 +10,7 @@ KFAC_DEBUG = True
 class KfacOptimizer():
 
     def __init__(self, learning_rate=0.01, momentum=0.9, clip_kl=0.01, kfac_update=2, stats_accum_iter=60,
-                 full_stats_init=False, cold_iter=100, cold_lr=None, async=False, async_stats=False, epsilon=1e-2,
+                 full_stats_init=False, cold_iter=100, cold_lr=None, async_var=False, async_stats=False, epsilon=1e-2,
                  stats_decay=0.95, blockdiag_bias=False, channel_fac=False, factored_damping=False, approxT2=False,
                  use_float64=False, weight_decay_dict={},max_grad_norm=0.5):
         self.max_grad_norm = max_grad_norm
@@ -19,7 +19,7 @@ class KfacOptimizer():
         self._clip_kl = clip_kl
         self._channel_fac = channel_fac
         self._kfac_update = kfac_update
-        self._async = async
+        self._async = async_var
         self._async_stats = async_stats
         self._epsilon = epsilon
         self._stats_decay = stats_decay

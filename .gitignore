@@ -1,2 +1,4 @@
 *.pyc
-__pycache__
+__pyciache__
+multi-agent-irl/atlas/
+multi-agent-irl/atlas_airl/

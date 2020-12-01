@@ -38,7 +38,7 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu)
 
 
 @click.command()
-@click.option('--logdir', type=click.STRING, default='/atlas/u/lantaoyu')
+@click.option('--logdir', type=click.STRING, default='/atlas/')
 @click.option('--env', type=click.Choice(['simple', 'simple_speaker_listener',
                                           'simple_crypto', 'simple_push',
                                           'simple_tag', 'simple_spread', 'simple_adversary']))
@@ -47,15 +47,15 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu)
 @click.option('--batch_size', type=click.INT, default=1000)
 @click.option('--atlas', is_flag=True, flag_value=True)
 def main(logdir, env, lr, seed, batch_size, atlas):
-    env_ids = [env]
-    lrs = [lr]
-    seeds = [seed]
-    batch_sizes = [batch_size]
+    env_ids = ['simple']
+    lrs = [0.1]
+    seeds = [1]
+    batch_sizes = [1000]
 
     print('logging to: ' + logdir)
 
     for env_id, seed, lr, batch_size in itertools.product(env_ids, seeds, lrs, batch_sizes):
-        train(logdir + '/exps/mack/' + env_id + '/l-{}-b-{}/seed-{}'.format(lr, batch_size, seed),
+        train("atlas",
               env_id, 5e7, lr, batch_size, seed, batch_size // 250)
 
 
