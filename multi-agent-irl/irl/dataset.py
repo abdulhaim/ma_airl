@@ -81,6 +81,7 @@ class MADataSet(object):
     def __init__(self, expert_path, train_fraction=0.7, ret_threshold=None, traj_limitation=np.inf, randomize=True,
                  nobs_flag=False):
         self.nobs_flag = nobs_flag
+        print(expert_path)
         with open(expert_path, "rb") as f:
             traj_data = pkl.load(f)
         num_agents = len(traj_data[0]["ob"])

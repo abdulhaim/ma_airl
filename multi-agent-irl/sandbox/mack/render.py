@@ -18,15 +18,13 @@ import pickle as pkl
 
 @click.command()
 @click.option('--path', type=click.STRING,
-              default='/tmp/exps/ma-acktr/simple/l-0.1-b-1000/seed-1/checkpoint01000'
-              )
-              # default='/atlas/u/hyren/malog/exps/acktr/simple/l-0.1-k-0.002-b-1000/seed-5/checkpoint00400')
-# default='/tmp/exps/ma-acktr/simple_speaker_listener/l-0.1-k-0.002-b-500/seed-1/checkpoint04000')
+              default='/Users/marwaabdulhai/Desktop/2020_2021/6.804/MA-AIRL/multi-agent-irl/atlas_2/exps/mack/simple_spread/l-0.1-b-1000/seed-1/checkpoint28000')
+
 def render(path):
     tf.reset_default_graph()
 
     def create_env():
-        env = make_env.make_env('simple')
+        env = make_env.make_env('simple_spread')
         env.seed(3)
         env = bench.Monitor(env, '/tmp/',  allow_early_resets=True)
         set_global_seeds(3)
@@ -34,7 +32,7 @@ def render(path):
 
     env = create_env()
     nenv = 1
-    n_agents = len(env.action_space)
+    n_agents = len(env.observation_space)
 
     ob_space = env.observation_space
     ac_space = env.action_space
@@ -49,8 +47,8 @@ def render(path):
 
     images = []
     sample_trajs = []
-    for i in range(20):
-        all_ob, all_agent_ob, all_ac, all_rew, ep_ret = [], [], [], [], [0, 0]
+    for i in range(200):
+        all_ob, all_agent_ob, all_ac, all_rew, ep_ret = [], [], [], [], [0, 0, 0]
         for k in range(n_agents):
             all_ob.append([])
             all_ac.append([])
@@ -68,6 +66,7 @@ def render(path):
                 all_ac[k].append(actions_list[k])
             all_agent_ob.append(np.concatenate(obs, axis=1))
             obs, rew, done, _ = env.step(actions_list)
+            len(rew)
             for k in range(n_agents):
                 all_rew[k].append(rew[k])
                 ep_ret[k] += rew[k]
@@ -90,8 +89,8 @@ def render(path):
         }
         sample_trajs.append(traj_data)
         print(ep_ret[0], ep_ret[1])
-    # pkl.dump(sample_trajs, open('/atlas/u/hyren/maexperts/test.pkl', 'wb'))
-    # imageio.mimsave('simple_push.mp4', images, fps=25)
+    pkl.dump(sample_trajs, open('atlas_2/checkpoint28000.pkl', 'wb'))
+    imageio.mimsave('atlas_2/simple_spread_checkpoint28000.mp4', images, fps=25)
 
 
 if __name__ == '__main__':

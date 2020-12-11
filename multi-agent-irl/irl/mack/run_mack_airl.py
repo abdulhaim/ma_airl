@@ -33,7 +33,6 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu,
 
     set_global_seeds(seed)
     env = SubprocVecEnv([create_env(i) for i in range(num_cpu)], is_multi_agent=True)
-    print(num_cpu)
     policy_fn = CategoricalPolicy
     expert = MADataSet(expert_path, ret_threshold=ret_threshold, traj_limitation=traj_limitation, nobs_flag=True)
     learn(policy_fn, expert, env, env_id, seed, total_timesteps=int(num_timesteps * 1.1), nprocs=num_cpu,
@@ -44,10 +43,10 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu,
 
 
 @click.command()
-@click.option('--logdir', type=click.STRING, default='/atlas/u/lantaoyu/exps')
+@click.option('--logdir', type=click.STRING, default='/atlas/exp')
 @click.option('--env', type=click.STRING, default='simple_spread')
 @click.option('--expert_path', type=click.STRING,
-              default='/atlas/u/lantaoyu/projects/MA-AIRL/mack/simple_spread/l-0.1-b-1000/seed-1/checkpoint20000-1000tra.pkl')
+              default='/Users/marwaabdulhai/Desktop/2020_2021/6.804/MA-AIRL/multi-agent-irl/atlas_2/checkpoint28000.pkl')
 @click.option('--seed', type=click.INT, default=1)
 @click.option('--traj_limitation', type=click.INT, default=200)
 @click.option('--ret_threshold', type=click.FLOAT, default=-10)
@@ -66,8 +65,9 @@ def main(logdir, env, expert_path, seed, traj_limitation, ret_threshold, dis_lr,
     batch_sizes = [1000]
 
     for env_id, seed, lr, batch_size in itertools.product(env_ids, seeds, lrs, batch_sizes):
-        train("atlas_airl",
-              env_id, 5e7, lr, batch_size, seed, batch_size // 250, "atlas/",
+        train('atlas/exp' + '/airl/' + env_id + '/' + disc_type + '/s-{}/l-{}-b-{}-d-{}-c-{}-l2-{}-iter-{}-r-{}/seed-{}'.format(
+              traj_limitation, lr, batch_size, dis_lr, bc_iters, l2, d_iters, rew_scale, seed),
+              env_id, 5e7, lr, batch_size, seed, batch_size // 250, expert_path,
               traj_limitation, ret_threshold, dis_lr, disc_type=disc_type, bc_iters=bc_iters, l2=l2, d_iters=d_iters,
               rew_scale=rew_scale)
 
