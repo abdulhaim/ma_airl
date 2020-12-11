@@ -37,7 +37,6 @@ def render(path):
     ob_space = env.observation_space
     ac_space = env.action_space
     n_actions = [action.n for action in ac_space]
-
     make_model = lambda: Model(
         CategoricalPolicy, ob_space, ac_space, 1, total_timesteps=1e7, nprocs=2, nsteps=500,
         nstack=1, ent_coef=0.01, vf_coef=0.5, vf_fisher_coef=1.0, lr=0.01, max_grad_norm=0.5, kfac_clip=0.001,
@@ -72,8 +71,9 @@ def render(path):
                 ep_ret[k] += rew[k]
             obs = [ob[None, :] for ob in obs]
             step += 1
-            img = env.render()
+            img = env.render(mode='rgb_array')
             images.append(img[0])
+            time.sleep(0.02)
 
             if step == 50 or True in done:
                 done = True
@@ -89,9 +89,8 @@ def render(path):
         }
         sample_trajs.append(traj_data)
         print(ep_ret[0], ep_ret[1])
-    pkl.dump(sample_trajs, open('atlas_2/checkpoint28000.pkl', 'wb'))
-    imageio.mimsave('atlas_2/simple_spread_checkpoint28000.mp4', images, fps=25)
-
+    # pkl.dump(sample_trajs, open('atlas_2/checkpoint28000.pkl', 'wb'))
+    imageio.mimsave("video_ground_truth" + '.mp4', images, fps=25)
 
 if __name__ == '__main__':
     render()

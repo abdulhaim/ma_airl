@@ -5,6 +5,8 @@ collab/
 indep/
 hinder/
 videos.zip
+HSPlanGaze/
+*.mp4
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -55,3 +57,4 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+

@@ -14,7 +14,7 @@ import pickle as pkl
 
 
 @click.command()
-@click.option('--env', type=click.STRING)
+@click.option('--env', type=click.STRING, default='simple_spread')
 @click.option('--image', is_flag=True, flag_value=True)
 def render(env, image):
     tf.reset_default_graph()
@@ -29,7 +29,7 @@ def render(env, image):
         return env
 
     env = create_env()
-    path = '/atlas/u/lantaoyu/exps/airl/simple_spread/decentralized/s-200/l-0.1-b-1000-d-0.1-c-500-l2-0.1-iter-1-r-0.0/seed-2/m_24000'
+    path = '/Users/marwaabdulhai/Desktop/2020_2021/6.804/MA-AIRL/multi-agent-irl/atlas/exp/airl/simple_spread/decentralized/s-200/l-0.1-b-1000-d-0.1-c-500-l2-0.1-iter-1-r-0.0/seed-1/m_05500'
 
     print(path)
     n_agents = len(env.action_space)
@@ -60,6 +60,7 @@ def render(env, image):
 
     for i in range(num_trajs):
         all_ob, all_agent_ob, all_ac, all_rew, ep_ret = [], [], [], [], [0 for k in range(n_agents)]
+        print(n_agents)
         for k in range(n_agents):
             all_ob.append([])
             all_ac.append([])
@@ -84,8 +85,7 @@ def render(env, image):
                 ep_ret[k] += rew[k]
             obs = [ob[None, :] for ob in obs]
             step += 1
-
-            if image:
+            if True:
                 img = env.render(mode='rgb_array')
                 images.append(img[0])
                 time.sleep(0.02)
@@ -116,9 +116,9 @@ def render(env, image):
 
     images = np.array(images)
     # pkl.dump(sample_trajs, open(path + '-%dtra.pkl' % num_trajs, 'wb'))
-    if image:
+    if True:
         print(images.shape)
-        imageio.mimsave(path + '.mp4', images, fps=25)
+        imageio.mimsave("video" + '.mp4', images, fps=25)
 
 
 if __name__ == '__main__':
