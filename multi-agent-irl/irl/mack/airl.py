@@ -28,7 +28,8 @@ class Model(object):
         self.sess = sess = tf.Session(config=config)
         nbatch = nenvs * nsteps
         self.num_agents = num_agents = len(ob_space)
-        self.n_actions = [ac_space[k].n for k in range(self.num_agents)]
+        self.single_n_actions = 14
+        self.n_actions = [self.single_n_actions for k in range(self.num_agents)]
         if identical is None:
             identical = [False for _ in range(self.num_agents)]
 
@@ -303,7 +304,7 @@ class Runner(object):
         self.discriminator = discriminator
         self.disc_type = disc_type
         self.nobs_flag = nobs_flag
-        self.num_agents = len(env.observation_space)
+        self.num_agents = 2
         self.nenv = nenv = env.num_envs
         self.batch_ob_shape = [
             (nenv * nsteps, nstack * env.observation_space[k].shape[0]) for k in range(self.num_agents)
@@ -479,8 +480,8 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
     buffer = None
 
     nenvs = env.num_envs
-    ob_space = env.observation_space
-    ac_space = env.action_space
+    ob_space = (env.observation_space, env.observation_space)
+    ac_space = (env.action_space, env.action_space)
     num_agents = (len(ob_space))
     make_model = lambda: Model(policy, ob_space, ac_space, nenvs, total_timesteps, nprocs=nprocs, nsteps=nsteps,
                                nstack=nstack, ent_coef=ent_coef, vf_coef=vf_coef, vf_fisher_coef=vf_fisher_coef,

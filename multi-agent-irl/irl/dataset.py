@@ -1,8 +1,9 @@
 import pickle as pkl
 import numpy as np
 from rl import logger
-from tqdm import tqdm
-
+from envs.box2d.gaze_two_agents import Maze_v1
+from utils import *
+from envs.box2d import *
 
 class Dset(object):
     def __init__(self, inputs, labels, nobs, all_obs, rews, randomize, num_agents, nobs_flag=False):
@@ -15,7 +16,7 @@ class Dset(object):
         self.rews = rews.copy()
         self.num_agents = num_agents
         assert len(self.inputs[0]) == len(self.labels[0])
-        self.randomize = randomize
+        self.randomize = False
         self.num_pairs = len(inputs[0])
         self.init_pointer()
 
@@ -25,8 +26,10 @@ class Dset(object):
             idx = np.arange(self.num_pairs)
             np.random.shuffle(idx)
             for k in range(self.num_agents):
-                self.inputs[k] = self.inputs[k][idx, :]
-                self.labels[k] = self.labels[k][idx, :]
+                k = np.array(k)
+                idx = np.array(idx)
+                self.inputs[k] = self.inputs[k][idx:]
+                self.labels[k] = self.labels[k][idx:]
                 if self.nobs_flag:
                     self.nobs[k] = self.nobs[k][idx, :]
                 self.rews[k] = self.rews[k][idx]
@@ -77,14 +80,17 @@ class Dset(object):
         self.init_pointer()
 
 
+def get_rewards(obs, acts, rews):
+    raise NotImplementedError
+
+
 class MADataSet(object):
     def __init__(self, expert_path, train_fraction=0.7, ret_threshold=None, traj_limitation=np.inf, randomize=True,
                  nobs_flag=False):
         self.nobs_flag = nobs_flag
-        print(expert_path)
         with open(expert_path, "rb") as f:
             traj_data = pkl.load(f)
-        num_agents = len(traj_data[0]["ob"])
+        num_agents = 2
         obs = []
         acs = []
         rets = []
@@ -100,23 +106,37 @@ class MADataSet(object):
             rets.append([])
             obs_next.append([])
 
-        np.random.shuffle(traj_data)
+        acs = traj_data['actions']
+        trajectories = traj_data['trajectories']
+        reward_values = traj_data['rewards']
+        rets = []
 
-        for traj in tqdm(traj_data):
-            if len(lens) >= traj_limitation:
-                break
-            for k in range(num_agents):
-                obs[k].append(traj["ob"][k])
-                acs[k].append(traj["ac"][k])
-                rews[k].append(traj["rew"][k])
-                rets[k].append(traj["ep_ret"][k])
-            lens.append(len(traj["ob"][0]))
-            all_obs.append(traj["all_ob"])
-        print("observation shape:", len(obs), len(obs[0]), len(obs[0][0]), len(obs[0][0][0]))
-        print("action shape:", len(acs), len(acs[0]), len(acs[0][0]), len(acs[0][0][0]))
-        print("reward shape:", len(rews), len(rews[0]), len(rews[0][0]))
+        for step in reward_values:
+            for agent_i in range(num_agents):
+                if agent_i >= len(rets):
+                    rets.append([step[agent_i]])
+                else:
+                    rets[agent_i].append(step[agent_i])
+
+        for k in range(num_agents):
+            for i in range(0, len(trajectories[k]) - 1, 5):
+                obs[k].append(list(trajectories[k][i]))
+            lens.append(len(trajectories[k]))
+
+        for i in range(0, len(obs[0])):
+            all_obs.append(obs[0][i])
+            for k in range(1, num_agents):
+                all_obs[i].extend(obs[k][i])
+
+        ## rews = rets # TODO: Must change...
+        # rews = get_rewards(obs, acs, rets)
+        rews = rets
+
+        print("observation shape:", len(obs), len(obs[0]), len(obs[0][0]))
+        print("action shape:", len(acs), len(acs[0]), len(acs[0]))
+        print("reward shape:", len(rews), len(rews[0]))
         print("return shape:", len(rets), len(rets[0]))
-        print("all observation shape:", len(all_obs), len(all_obs[0]), len(all_obs[0][0]))
+        print("all observation shape:", len(all_obs), len(all_obs[0]))
         self.num_traj = len(rets[0])
         self.avg_ret = np.sum(rets, axis=1) / len(rets[0])
         self.avg_len = sum(lens) / len(lens)
@@ -126,10 +146,10 @@ class MADataSet(object):
         self.acs = acs
         self.rews = rews
 
-        for k in range(num_agents):
-            self.obs[k] = np.concatenate(self.obs[k])
-            self.acs[k] = np.concatenate(self.acs[k])
-            self.rews[k] = np.concatenate(self.rews[k])
+        # for k in range(num_agents):
+        #     self.obs[k] = np.concatenate(self.obs[k])
+        #     self.acs[k] = np.concatenate(self.acs[k])
+        #     self.rews[k] = np.concatenate(self.rews[k])
         self.all_obs = np.concatenate(all_obs)
 
         # get next observation

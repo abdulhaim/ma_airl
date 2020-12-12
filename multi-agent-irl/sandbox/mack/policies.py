@@ -9,11 +9,12 @@ class CategoricalPolicy(object):
     def __init__(self, sess, ob_space, ac_space, ob_spaces, ac_spaces,
                  nenv, nsteps, nstack, reuse=False, name='model'):
         nbatch = nenv * nsteps
-        ob_shape = (nbatch, ob_space.shape[0] * nstack)
-        all_ob_shape = (nbatch, sum([obs.shape[0] for obs in ob_spaces]) * nstack)
-        nact = ac_space.n
+        print(ob_space)
+        ob_shape = (nbatch, ob_space * nstack)
+        all_ob_shape = (nbatch, sum([obs for obs in ob_spaces]) * nstack)
+        nact = len(ac_space)
         actions = tf.placeholder(tf.int32, (nbatch))
-        all_ac_shape = (nbatch, (sum([ac.n for ac in ac_spaces]) - nact) * nstack)
+        all_ac_shape = (nbatch, (sum([14 for ac in ac_spaces]) - nact) * nstack)
         X = tf.placeholder(tf.float32, ob_shape)  # obs
         X_v = tf.placeholder(tf.float32, all_ob_shape)
         A_v = tf.placeholder(tf.float32, all_ac_shape)
