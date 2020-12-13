@@ -219,8 +219,12 @@ class Model(object):
                     A[k]: np.concatenate([actions[j] for j in range(k, pointer[k])], axis=0),
                     PG_LR[k]: cur_lr / float(scale[k])
                 })
+                print("CLONE OPS", clone_ops[k])
+                print("-----------------")
+                print("NEW MAP", new_map)
                 sess.run(clone_ops[k], feed_dict=new_map)
                 td_map.update(new_map)
+
             lld_loss = sess.run([lld], td_map)
             return lld_loss
 
@@ -307,10 +311,10 @@ class Runner(object):
         self.num_agents = 2
         self.nenv = nenv = env.num_envs
         self.batch_ob_shape = [
-            (nenv * nsteps, nstack * env.observation_space[k].shape[0]) for k in range(self.num_agents)
+            (nenv * nsteps, nstack * env.observation_space[k]) for k in range(self.num_agents)
         ]
         self.obs = [
-            np.zeros((nenv, nstack * env.observation_space[k].shape[0])) for k in range(self.num_agents)
+            np.zeros((nenv, nstack * env.observation_space[k])) for k in range(self.num_agents)
         ]
         self.actions = [np.zeros((nenv, )) for _ in range(self.num_agents)]
         obs = env.reset()
@@ -319,7 +323,7 @@ class Runner(object):
         self.lam = lam
         self.nsteps = nsteps
         self.states = model.initial_state
-        self.n_actions = [env.action_space[k].n for k in range(self.num_agents)]
+        self.n_actions = [len(env.action_space[k]) for k in range(self.num_agents)]
         self.dones = [np.array([False for _ in range(nenv)]) for k in range(self.num_agents)]
 
     def update_obs(self, obs):
@@ -471,6 +475,28 @@ class Runner(object):
                    mb_values, mb_all_obs, mh_actions, mh_all_actions, mb_rewards, mb_true_rewards, mb_true_returns
 
 
+def convert_to_one_hot(actions):
+    actions_code = {'turnleft': [0, 0, 0, 0],
+               'turnright': [0, 0, 0, 1],
+               'up': [0, 0, 1, 0],
+               'down': [0, 0, 1, 1],
+               'left': [0, 1, 0, 0],
+               'right': [0, 1, 0, 1],
+               'upleft': [0, 1, 1, 0],
+               'upright': [0, 1, 1, 1],
+               'downleft': [1, 0, 0, 0],
+               'downright': [1, 0, 0, 1],
+               'stop':  [1, 0, 1, 0],
+               'noforce': [1, 0, 1, 1],
+               'attach': [1, 1, 0, 0],
+               'detach': [1, 1, 0, 1]}
+    one_hot_encoded = []
+
+    for action in actions:
+        one_hot_encoded.append(actions_code[action])
+    return one_hot_encoded
+
+
 def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.99, lam=0.95, log_interval=1, nprocs=32,
           nsteps=20, nstack=1, ent_coef=0.01, vf_coef=0.5, vf_fisher_coef=1.0, lr=0.25, max_grad_norm=0.5,
           kfac_clip=0.001, save_interval=100, lrschedule='linear', dis_lr=0.001, disc_type='decentralized',
@@ -528,7 +554,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
     # enqueue_threads = [q_runner.create_threads(model.sess, coord=coord, start=True) for q_runner in model.q_runner]
     for _ in range(bc_iters):
         e_obs, e_actions, e_nobs, _, _ = expert.get_next_batch(nenvs * nsteps)
-        e_a = [np.argmax(e_actions[k], axis=1) for k in range(len(e_actions))]
+        e_a = [np.argmax(convert_to_one_hot(e_actions[k]), axis=1) for k in range(len(e_actions))]
         lld_loss = model.clone(e_obs, e_a)
         # print(lld_loss)
 

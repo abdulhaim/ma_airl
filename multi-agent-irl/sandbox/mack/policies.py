@@ -10,8 +10,8 @@ class CategoricalPolicy(object):
                  nenv, nsteps, nstack, reuse=False, name='model'):
         nbatch = nenv * nsteps
         print(ob_space)
-        ob_shape = (nbatch, ob_space * nstack)
-        all_ob_shape = (nbatch, sum([obs for obs in ob_spaces]) * nstack)
+        ob_shape = (nbatch, ob_space[0] * nstack)
+        all_ob_shape = (nbatch, sum([obs[0] for obs in ob_spaces]) * nstack)
         nact = len(ac_space)
         actions = tf.placeholder(tf.int32, (nbatch))
         all_ac_shape = (nbatch, (sum([14 for ac in ac_spaces]) - nact) * nstack)

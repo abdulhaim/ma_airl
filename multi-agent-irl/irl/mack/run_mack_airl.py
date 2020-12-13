@@ -18,13 +18,18 @@ from envs.box2d.gaze_two_agents import Maze_v1
 from utils import *
 from envs.box2d import *
 
+
+
 def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu, expert_path,
           traj_limitation, ret_threshold, dis_lr, disc_type='decentralized', bc_iters=500, l2=0.1, d_iters=1,
           rew_scale=0.1):
     def create_env(rank):
         def _thunk():
+            maze_sampler = MazeSampler()
+            maze_sampler.gen_env_defs()
+
             env = Maze_v1(action_type='force',
-                          maze_sampler= MazeSampler(),
+                          maze_sampler= maze_sampler,
                           goals=[8, 5],
                           strengths=[2,2],
                           sizes=[0,0,1,0],

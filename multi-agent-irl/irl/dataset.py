@@ -5,6 +5,7 @@ from envs.box2d.gaze_two_agents import Maze_v1
 from utils import *
 from envs.box2d import *
 
+
 class Dset(object):
     def __init__(self, inputs, labels, nobs, all_obs, rews, randomize, num_agents, nobs_flag=False):
         self.inputs = inputs.copy()
@@ -44,12 +45,12 @@ class Dset(object):
         end = self.pointer + batch_size
         inputs, labels, rews, nobs = [], [], [], []
         for k in range(self.num_agents):
-            inputs.append(self.inputs[k][self.pointer:end, :])
-            labels.append(self.labels[k][self.pointer:end, :])
+            inputs.append(self.inputs[k][self.pointer:end])
+            labels.append(self.labels[k][self.pointer:end])
             rews.append(self.rews[k][self.pointer:end])
             if self.nobs_flag:
-                nobs.append(self.nobs[k][self.pointer:end, :])
-        all_obs = self.all_obs[self.pointer:end, :]
+                nobs.append(self.nobs[k][self.pointer:end])
+        all_obs = self.all_obs[self.pointer:end]
         self.pointer = end
         if self.nobs_flag:
             return inputs, labels, nobs, all_obs, rews
@@ -84,12 +85,30 @@ def get_rewards(obs, acts, rews):
     raise NotImplementedError
 
 
+def land_marks(room_dim):
+    land_marks_list = []
+    land_marks_list.extend([16 - room_dim[0] / 2 + 2.5, 12 + room_dim[1] / 2 - 2.5])
+    land_marks_list.extend([16 + room_dim[0] / 2 - 2.5, 12 + room_dim[1] / 2 - 2.5])
+    land_marks_list.extend([16 + room_dim[0] / 2 - 2.5, 12 - room_dim[1] / 2 + 2.5])
+    land_marks_list.extend([16 - room_dim[0] / 2 + 2.5, 12 - room_dim[1] / 2 + 2.5])
+
+    return land_marks_list
+
+
+def one_hot(num):
+    if num == 0:
+        return 0
+    else:
+        return 1
+
+
 class MADataSet(object):
     def __init__(self, expert_path, train_fraction=0.7, ret_threshold=None, traj_limitation=np.inf, randomize=True,
                  nobs_flag=False):
         self.nobs_flag = nobs_flag
         with open(expert_path, "rb") as f:
             traj_data = pkl.load(f)
+
         num_agents = 2
         obs = []
         acs = []
@@ -118,25 +137,39 @@ class MADataSet(object):
                 else:
                     rets[agent_i].append(step[agent_i])
 
+        ## obs: agent1, agent2, ob1, ob2, one_hot, land_marks
         for k in range(num_agents):
             for i in range(0, len(trajectories[k]) - 1, 5):
-                obs[k].append(list(trajectories[k][i]))
+                # temp = []
+                agent_1 = [i for i in trajectories[k][i]]
+                # temp.extend(agent_1)  # agent 1 or 2
+                agent_2 = [i for i in trajectories[k % 1][i]]
+                # temp.extend(agent_2) # agent 1 or 2
+                obj1 = [i for i in trajectories[2][i]]
+                # temp.extend(obj1) # obj 1
+                obj2 = [i for i in trajectories[3][i]]
+                # temp.extend(obj2)  # obj 1
+                land_marks_list = land_marks((20, 20))
+                # temp.extend(land_marks_list) # land-mark
+                one_hot_encoding = [one_hot(k)]
+                temp = agent_1 + agent_2 + obj1 + obj2 + land_marks_list + one_hot_encoding
+                # temp.extend(one_hot_encoding)
+                obs[k].append(temp)
             lens.append(len(trajectories[k]))
 
         for i in range(0, len(obs[0])):
-            all_obs.append(obs[0][i])
-            for k in range(1, num_agents):
-                all_obs[i].extend(obs[k][i])
+            temp = []
+            temp += obs[0][i]
+            temp += obs[1][i]
+            all_obs.append(temp)
 
-        ## rews = rets # TODO: Must change...
-        # rews = get_rewards(obs, acs, rets)
         rews = rets
-
         print("observation shape:", len(obs), len(obs[0]), len(obs[0][0]))
-        print("action shape:", len(acs), len(acs[0]), len(acs[0]))
+        print("action shape:", len(acs), len(acs[0]))
         print("reward shape:", len(rews), len(rews[0]))
         print("return shape:", len(rets), len(rets[0]))
         print("all observation shape:", len(all_obs), len(all_obs[0]))
+
         self.num_traj = len(rets[0])
         self.avg_ret = np.sum(rets, axis=1) / len(rets[0])
         self.avg_len = sum(lens) / len(lens)

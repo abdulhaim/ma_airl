@@ -55,7 +55,7 @@ class SubprocVecEnv(VecEnv):
                 n = len(self.action_space)
             except:
                 n = len(self.action_space.spaces)
-            self.num_agents = n
+            self.num_agents = 2
 
     def step_async(self, actions):
         # if self.is_multi_agent:
@@ -95,6 +95,8 @@ class SubprocVecEnv(VecEnv):
             remote.send(('reset', None))
         if self.is_multi_agent:
             results = [remote.recv() for remote in self.remotes]
+            print("RESULTS", results)
+            print("NUM AGENTS", self.num_agents)
             obs = [[result[k] for result in results] for k in range(self.num_agents)]
             obs = [np.stack(ob) for ob in obs]
             return obs
