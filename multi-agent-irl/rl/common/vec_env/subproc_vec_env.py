@@ -95,8 +95,6 @@ class SubprocVecEnv(VecEnv):
             remote.send(('reset', None))
         if self.is_multi_agent:
             results = [remote.recv() for remote in self.remotes]
-            print("RESULTS", results)
-            print("NUM AGENTS", self.num_agents)
             obs = [[result[k] for result in results] for k in range(self.num_agents)]
             obs = [np.stack(ob) for ob in obs]
             return obs

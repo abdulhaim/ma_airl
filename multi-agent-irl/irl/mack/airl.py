@@ -18,7 +18,7 @@ from irl.dataset import Dset
 
 
 class Model(object):
-    def __init__(self, policy, ob_space, ac_space, nenvs, total_timesteps, nprocs=2, nsteps=200,
+    def __init__(self, policy, ob_space, ac_space, nenvs, total_timesteps, nprocs=2, nsteps=40,
                  nstack=1, ent_coef=0.00, vf_coef=0.5, vf_fisher_coef=1.0, lr=0.25, max_grad_norm=0.5,
                  kfac_clip=0.001, lrschedule='linear', identical=None):
         config = tf.ConfigProto(allow_soft_placement=True,
@@ -26,9 +26,10 @@ class Model(object):
                                 inter_op_parallelism_threads=nprocs)
         config.gpu_options.allow_growth = True
         self.sess = sess = tf.Session(config=config)
+        nsteps = 10
         nbatch = nenvs * nsteps
         self.num_agents = num_agents = len(ob_space)
-        self.single_n_actions = 14
+        self.single_n_actions = 4
         self.n_actions = [self.single_n_actions for k in range(self.num_agents)]
         if identical is None:
             identical = [False for _ in range(self.num_agents)]
@@ -219,9 +220,6 @@ class Model(object):
                     A[k]: np.concatenate([actions[j] for j in range(k, pointer[k])], axis=0),
                     PG_LR[k]: cur_lr / float(scale[k])
                 })
-                print("CLONE OPS", clone_ops[k])
-                print("-----------------")
-                print("NEW MAP", new_map)
                 sess.run(clone_ops[k], feed_dict=new_map)
                 td_map.update(new_map)
 
@@ -310,6 +308,7 @@ class Runner(object):
         self.nobs_flag = nobs_flag
         self.num_agents = 2
         self.nenv = nenv = env.num_envs
+        self.nsteps = 10
         self.batch_ob_shape = [
             (nenv * nsteps, nstack * env.observation_space[k]) for k in range(self.num_agents)
         ]
@@ -323,7 +322,7 @@ class Runner(object):
         self.lam = lam
         self.nsteps = nsteps
         self.states = model.initial_state
-        self.n_actions = [len(env.action_space[k]) for k in range(self.num_agents)]
+        self.n_actions = [4 for k in range(self.num_agents)]
         self.dones = [np.array([False for _ in range(nenv)]) for k in range(self.num_agents)]
 
     def update_obs(self, obs):
@@ -350,7 +349,6 @@ class Runner(object):
         mb_states = self.states
         for n in range(self.nsteps):
             actions, values, states = self.model.step(self.obs, self.actions)
-
             self.actions = actions
             for k in range(self.num_agents):
                 mb_obs[k].append(np.copy(self.obs[k]))
@@ -380,6 +378,7 @@ class Runner(object):
                 rewards = []
                 report_rewards = []
                 for k in range(self.num_agents):
+
                     rewards.append(np.squeeze(self.discriminator[k].get_reward(re_obs[k],
                                                                                multionehot(re_actions[k], self.n_actions[k]),
                                                                                re_obs_next[k],
@@ -504,7 +503,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
     tf.reset_default_graph()
     set_global_seeds(seed)
     buffer = None
-
+    nsteps = 10
     nenvs = env.num_envs
     ob_space = (env.observation_space, env.observation_space)
     ac_space = (env.action_space, env.action_space)
@@ -586,8 +585,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
         for d_iter in range(d_iters):
             e_obs, e_actions, e_nobs, e_all_obs, _ = expert.get_next_batch(d_minibatch)
             g_obs, g_actions, g_nobs, g_all_obs, _ = buffer.get_next_batch(batch_size=d_minibatch)
-
-            e_a = [np.argmax(e_actions[k], axis=1) for k in range(len(e_actions))]
+            e_a = [np.argmax(convert_to_one_hot(e_actions[k]), axis=1) for k in range(len(e_actions))]
             g_a = [np.argmax(g_actions[k], axis=1) for k in range(len(g_actions))]
 
             g_log_prob = model.get_log_action_prob(g_obs, g_a)
@@ -600,7 +598,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
                         g_nobs[k],
                         g_log_prob[k].reshape([-1, 1]),
                         e_obs[k],
-                        e_actions[k],
+                        convert_to_one_hot(e_actions[k]),
                         e_nobs[k],
                         e_log_prob[k].reshape([-1, 1])
                     )
@@ -656,6 +654,11 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
                     logger.record_tabular("policy_entropy %d" % k, float(policy_entropy[k]))
                     logger.record_tabular("policy_loss %d" % k, float(policy_loss[k]))
                     logger.record_tabular("value_loss %d" % k, float(value_loss[k]))
+                    print(value_loss[k])
+                    print(policy_loss[k])
+                    print(policy_entropy[k])
+
+                    assert 1 == 2
                     try:
                         logger.record_tabular('pearson %d' % k, float(
                             pearsonr(report_rewards[k].flatten(), mh_true_returns[k].flatten())[0]))

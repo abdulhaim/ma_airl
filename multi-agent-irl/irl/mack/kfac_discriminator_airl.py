@@ -29,15 +29,15 @@ class Discriminator(object):
         self.ob_shape = ob_space[0] * nstack
         self.all_ob_shape = sum([58 for obs in ob_spaces]) * nstack
         try:
-            nact = 14
+            nact = 4
         except:
-            nact = 14
+            nact = 4
         self.ac_shape = nact * nstack
         self.all_ob_shape = sum([58 for obs in ob_spaces]) * nstack
         try:
-            self.all_ac_shape = sum([14 for ac in ac_spaces]) * nstack
+            self.all_ac_shape = sum([4 for ac in ac_spaces]) * nstack
         except:
-            self.all_ac_shape = sum([14 for ac in ac_spaces]) * nstack
+            self.all_ac_shape = sum([4 for ac in ac_spaces]) * nstack
         self.hidden_size = hidden_size
 
         if disc_type == 'decentralized':
@@ -138,17 +138,19 @@ class Discriminator(object):
         else:
             feed_dict = {self.obs: obs,
                          self.act: acs}
+
             score = self.sess.run(self.reward, feed_dict)
         return score
 
     def train(self, g_obs, g_acs, g_nobs, g_probs, e_obs, e_acs, e_nobs, e_probs):
-        labels = np.concatenate((np.zeros([g_obs.shape[0], 1]), np.ones([e_obs.shape[0], 1])), axis=0)
+        labels = np.concatenate((np.zeros([len(g_obs), 1]), np.ones([len(e_obs), 1])), axis=0)
         feed_dict = {self.obs: np.concatenate([g_obs, e_obs], axis=0),
                      self.act: np.concatenate([g_acs, e_acs], axis=0),
                      self.nobs: np.concatenate([g_nobs, e_nobs], axis=0),
                      self.lprobs: np.concatenate([g_probs, e_probs], axis=0),
                      self.labels: labels,
                      self.lr_rate: self.lr.value()}
+
         loss, _ = self.sess.run([self.total_loss, self.d_optim], feed_dict)
         return loss
 

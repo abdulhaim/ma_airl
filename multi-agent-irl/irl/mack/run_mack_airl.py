@@ -19,7 +19,6 @@ from utils import *
 from envs.box2d import *
 
 
-
 def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu, expert_path,
           traj_limitation, ret_threshold, dis_lr, disc_type='decentralized', bc_iters=500, l2=0.1, d_iters=1,
           rew_scale=0.1):
@@ -30,7 +29,7 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu,
 
             env = Maze_v1(action_type='force',
                           maze_sampler= maze_sampler,
-                          goals=[8, 5],
+                          goals=[['LMA', 0, 0, 1], ['LMO', 0, 1, 1]],
                           strengths=[2,2],
                           sizes=[0,0,1,0],
                           densities=[0, 0, 0, 0],
@@ -78,12 +77,12 @@ def train(logdir, env_id, num_timesteps, lr, timesteps_per_batch, seed, num_cpu,
 def main(logdir, env, expert_path, seed, traj_limitation, ret_threshold, dis_lr, disc_type, bc_iters, l2, d_iters,
          rew_scale):
     env_ids = [env]
-    lrs = [0.1]
+    lrs = [0.001]
     seeds = [seed]
     batch_sizes = [1000]
 
     for env_id, seed, lr, batch_size in itertools.product(env_ids, seeds, lrs, batch_sizes):
-        train('atlas/exp' + '/airl/' + env_id + '/' + disc_type + '/s-{}/l-{}-b-{}-d-{}-c-{}-l2-{}-iter-{}-r-{}/seed-{}'.format(
+        train('atlas/exp' + '/airl_4/' + env_id + '/' + disc_type + '/s-{}/l-{}-b-{}-d-{}-c-{}-l2-{}-iter-{}-r-{}/seed-{}'.format(
               traj_limitation, lr, batch_size, dis_lr, bc_iters, l2, d_iters, rew_scale, seed),
               env_id, 5e7, lr, batch_size, seed, batch_size // 250, expert_path,
               traj_limitation, ret_threshold, dis_lr, disc_type=disc_type, bc_iters=bc_iters, l2=l2, d_iters=d_iters,

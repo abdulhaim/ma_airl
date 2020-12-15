@@ -177,6 +177,8 @@ polygonShape.draw = my_draw_polygon
 
 
 def _my_draw_patch(pos, screen, color, PPM, SCREEN_WIDTH, SCREEN_HEIGHT):
+    # print(pos)
+    # print(PPM)
     position = [(pos[0] - 2.5) * PPM, (pos[1] + 2.5) * PPM]
     position = (position[0], SCREEN_HEIGHT - position[1])
     pygame.draw.rect(screen, color, [int(
@@ -606,7 +608,7 @@ class Maze_v1(gym.Env):
                  visibility,
                  num_agents=2,
                  num_items=2,
-                 all_directions=False,
+                 all_directions=True,
                  PPM=20.0,
                  TARGET_FPS=60,
                  SCREEN_WIDTH=640,
@@ -661,9 +663,9 @@ class Maze_v1(gym.Env):
         if all_directions:
             self.action_space = ['turnleft', 'turnright', 'up', 'down', 'left', 'right', 'upleft', 'upright', 'downleft', 'downright', 'stop', 'noforce', 'attach', 'detach']
         else:
-            self.action_space = ['turnleft', 'turnright', 'up', 'stop', 'noforce', 'attach', 'detach']
+            self.action_space = ['turnleft', 'turnright', 'up', 'down', 'left', 'right', 'upleft', 'upright', 'downleft', 'downright', 'stop', 'noforce', 'attach', 'detach']
             # self.action_space = ['turnleft', 'turnright', 'up', 'down', 'left', 'right', 'stop', 'noforce', 'attach', 'detach']
-        self.action_size = len(self.action_space)
+        self.action_size = 4
         if self.enable_renderer:
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
             pygame.display.set_caption('Maze_v1')
@@ -882,17 +884,24 @@ class Maze_v1(gym.Env):
         self.attached = [None] * self.num_agents
         self.once_attached = [False] * self.num_agents
 
+        def land_marks(room_dim):
+            land_marks_list = []
+            land_marks_list.extend([16 - room_dim[0] / 2 + 2.5, 12 + room_dim[1] / 2 - 2.5])
+            land_marks_list.extend([16 + room_dim[0] / 2 - 2.5, 12 + room_dim[1] / 2 - 2.5])
+            land_marks_list.extend([16 + room_dim[0] / 2 - 2.5, 12 - room_dim[1] / 2 + 2.5])
+            land_marks_list.extend([16 - room_dim[0] / 2 + 2.5, 12 - room_dim[1] / 2 + 2.5])
+
+            return land_marks_list
+
+
+
+        self.landmark_centers_obs = land_marks(self.room_dim)
+
         self.landmark_centers = [
-        [16 - self.room_dim[0] / 2 + 2.5, 12 + self.room_dim[1] / 2 - 2.5],
-        [16 + self.room_dim[0] / 2 - 2.5, 12 + self.room_dim[1] / 2 - 2.5],
-        [16 + self.room_dim[0] / 2 - 2.5, 12 - self.room_dim[1] / 2 + 2.5],
-        [16 - self.room_dim[0] / 2 + 2.5, 12 - self.room_dim[1] / 2 + 2.5],
-        ]
-        self.landmark_corners = [
-        [16 - self.room_dim[0] / 2 + 1.25, 12 + self.room_dim[1] / 2 - 1.25],
-        [16 + self.room_dim[0] / 2 - 1.25, 12 + self.room_dim[1] / 2 - 1.25],
-        [16 + self.room_dim[0] / 2 - 1.25, 12 - self.room_dim[1] / 2 + 1.25],
-        [16 - self.room_dim[0] / 2 + 1.25, 12 - self.room_dim[1] / 2 + 1.25],
+        (16 - self.room_dim[0] / 2 + 2.5, 12 + self.room_dim[1] / 2 - 2.5),
+        (16 + self.room_dim[0] / 2 - 2.5, 12 + self.room_dim[1] / 2 - 2.5),
+        (16 + self.room_dim[0] / 2 - 2.5, 12 - self.room_dim[1] / 2 + 2.5),
+        (16 - self.room_dim[0] / 2 + 2.5, 12 - self.room_dim[1] / 2 + 2.5),
         ]
 
         # if landmark_color_order is not None:
@@ -1022,9 +1031,6 @@ class Maze_v1(gym.Env):
         obs_n = []
         for agent_id, agent in enumerate(self.agents):
             obs_n.append(self._get_obs(agent_id))
-        print(len(obs_n))
-        print(len(obs_n[0]))
-        print(len(obs_n[0][0]))
         return obs_n
 
 
@@ -1045,9 +1051,17 @@ class Maze_v1(gym.Env):
             elif obs == 'item':
                 state = self.item_states[entity_id]
                 observed_entity_states[self.num_agents+entity_id] = [state['pos'][0], state['pos'][1], state['vel'][0], state['vel'][1], state['angle']]
-        observation_output = observed_entity_states + self.landmark_centers + [agent_id]
-        print("SHAPDOhuwegryfhowksdefhejrws", len(observation_output))
 
+        observed_entity_states_new = []
+        for i in observed_entity_states:
+            if i is not None:
+                value = [j for j in i]
+                observed_entity_states_new.extend(value)
+            else:
+                value = [None for i in range(5)]
+                observed_entity_states_new.extend(value)
+
+        observation_output = observed_entity_states_new + self.landmark_centers_obs + [agent_id]
         return observation_output
 
 
@@ -1128,8 +1142,9 @@ class Maze_v1(gym.Env):
         #     return ['turnleft', 'turnright', 'up', 'down', 'stop', 'noforce']
         else:
             num_actions = min(num_actions, len(self.action_space) - 2)
-        print('get_action_space', self.goals[agent_id], self.action_space[:num_actions])
+        # print('get_action_space', self.goals[agent_id], self.action_space[:num_actions])
         return self.action_space[:num_actions]
+
 
 
     def send_action(self, agent_id, action):
@@ -1145,7 +1160,7 @@ class Maze_v1(gym.Env):
             right_mid_point = self.agents[agent_id].GetWorldPoint(localPoint=(SIZE[self.sizes[agent_id]], 0.0))
             left_mid_point = self.agents[agent_id].GetWorldPoint(localPoint=(-SIZE[self.sizes[agent_id]], 0.0))
             all_agent_pos = [head_mid_point, tail_mid_point, right_mid_point, left_mid_point]
-            print(all_agent_pos)
+            # print(all_agent_pos)
             if self.attached[agent_id] is None:
                 min_dist = 1e6
                 selected_item_id = None
@@ -1160,11 +1175,11 @@ class Maze_v1(gym.Env):
                         selected_item_id = item_id
                         selected_agent_anchor_idx = agent_anchor_idx
                 if selected_item_id is None:
-                    print('no attach')
+                    # print('no attach')
                     return
                 f = {'spring': 0.3, 'rope': 0.1, 'rod': 100}
                 d = {'spring': 0, 'rope': 0, 'rod': 0.5}
-                print('selected_item_id',selected_item_id)
+                # print('selected_item_id',selected_item_id)
                 agent_size, object_size = SIZE[self.sizes[agent_id]], SIZE[self.sizes[self.num_agents + selected_item_id]]
                 agent_anchors = [(0, agent_size + object_size), (0, -agent_size - object_size),
                                  (agent_size + object_size, 0), (-agent_size - object_size, 0)]
@@ -1297,6 +1312,7 @@ class Maze_v1(gym.Env):
                                                 agent_vel[0], agent_vel[1], agent_angle))
             if self.actions[agent_id] is None:
                 self.actions[agent_id] = [self.repeat_actions[agent_id]]
+                # print(self.actions[agent_id])
             else:
                 self.actions[agent_id].append(self.repeat_actions[agent_id])
         self.item_states = [_get_state_from_body(body) for body in self.items]
@@ -1363,11 +1379,11 @@ class Maze_v1(gym.Env):
         reward_n = []
         done_n = []
         info_n = {'n': []}
-        print()
-        print("AGENTS", self.agents)
+        # print()
+        # print("AGENTS", self.agents)
         for agent_id, agent in enumerate(self.agents):
             obs_n.append(self._get_obs(agent_id))
-            reward_n.append(self.get_reward_state(agent_id))
+            reward_n.append(self.get_reward_state(agent_id, self.get_state(), actions[agent_id]))
             done_n.append(self._get_done(agent))
 
         return obs_n, reward_n, done_n, info_n
@@ -3617,9 +3633,9 @@ class Maze_v1(gym.Env):
         agent_room = self._get_room_id(self.agent_states[agent_id]['pos'])
         goal_room = goal[2]
 
-        print(self.attached[agent_id] is not None, self.attached[goal_agent] is not None)
-        print(self.agent_states[agent_id]['attached'], self.agent_states[goal_agent]['attached'])
-        print(agent_room, goal_room)
+        # print(self.attached[agent_id] is not None, self.attached[goal_agent] is not None)
+        # print(self.agent_states[agent_id]['attached'], self.agent_states[goal_agent]['attached'])
+        # print(agent_room, goal_room)
         agent_goal_blocked = False
         if agent_room != goal_room:
             path = self.path[(agent_room, goal_room)]
