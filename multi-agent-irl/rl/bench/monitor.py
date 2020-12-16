@@ -64,7 +64,7 @@ class Monitor(Wrapper):
             raise RuntimeError("Tried to reset an environment before done. If you want to allow early resets, wrap your env with Monitor(env, path, allow_early_resets=True)")
         try:
             self.rewards = []
-            for k in range(self.env.n):
+            for k in range(2):
                 self.rewards.append([])
             #print ("It's a multiagent environment")
         except:

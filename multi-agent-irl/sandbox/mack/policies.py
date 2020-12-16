@@ -9,8 +9,12 @@ class CategoricalPolicy(object):
     def __init__(self, sess, ob_space, ac_space, ob_spaces, ac_spaces,
                  nenv, nsteps, nstack, reuse=False, name='model'):
         nbatch = nenv * nsteps
-        ob_shape = (nbatch, ob_space[0] * nstack)
-        all_ob_shape = (nbatch, sum([obs[0] for obs in ob_spaces]) * nstack)
+        print(ob_space)
+        print(ob_spaces)
+        ob_shape = (nbatch, 29 * nstack)
+        all_ob_shape = (nbatch, sum([29 for obs in ob_spaces]) * nstack)
+        print(all_ob_shape)
+        # assert 1 == 8
         nact = 4
         actions = tf.placeholder(tf.int32, (nbatch))
         all_ac_shape = (nbatch, 4)
@@ -31,7 +35,7 @@ class CategoricalPolicy(object):
             h4 = fc(h3, 'fc4', nh=256, init_scale=np.sqrt(2))
             vf = fc(h4, 'v', 1, act=lambda x: x)
 
-        self.log_prob = -tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pi, labels=actions)
+        self.log_prob = -tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pi + 1e-6, labels=actions)
         v0 = vf[:, 0]
         a0 = sample(pi)
         self.initial_state = []  # not stateful
@@ -82,7 +86,7 @@ class GaussianPolicy(object):
         with tf.variable_scope('policy_{}'.format(name), reuse=reuse):
             logstd = tf.get_variable('sigma', shape=[nact], dtype=tf.float32,
                                      initializer=tf.constant_initializer(0.0))
-            logstd = tf.expand_dims(logstd, 0)
+            logstd = tf.expand_dims(logstd, 0) + 1e-6
             std = tf.exp(logstd)
             std = tf.tile(std, [nbatch, 1])
 

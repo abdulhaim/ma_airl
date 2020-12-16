@@ -137,6 +137,7 @@ class MADataSet(object):
                 else:
                     rets[agent_i].append(step[agent_i])
 
+        print(reward_values)
         ## obs: agent1, agent2, ob1, ob2, one_hot, land_marks
         for k in range(num_agents):
             for i in range(0, len(trajectories[k]) - 1, 5):
@@ -152,8 +153,9 @@ class MADataSet(object):
                 land_marks_list = land_marks((20, 20))
                 # temp.extend(land_marks_list) # land-mark
                 one_hot_encoding = [one_hot(k)]
-                temp = agent_1 + agent_2 + obj1 + obj2 + land_marks_list + one_hot_encoding
-                # temp.extend(one_hot_encoding)
+
+                temp = agent_1 + agent_2 + obj1 + obj2 + land_marks_list
+                temp.extend(one_hot_encoding)
                 obs[k].append(temp)
             lens.append(len(trajectories[k]))
 

@@ -85,17 +85,17 @@ class Model(object):
             lld.append(tf.reduce_mean(logpac))
             logits.append(train_model[k].pi)
 
-            pg_loss.append(tf.reduce_mean(ADV[k] * logpac))
-            entropy.append(tf.reduce_mean(cat_entropy(train_model[k].pi)))
-            pg_loss[k] = pg_loss[k] - ent_coef * entropy[k]
-            vf_loss.append(tf.reduce_mean(mse(tf.squeeze(train_model[k].vf), R[k])))
-            train_loss.append(pg_loss[k] + vf_coef * vf_loss[k])
+            pg_loss.append(tf.reduce_mean(ADV[k] * logpac) + 1e-6)
+            entropy.append(tf.reduce_mean(cat_entropy(train_model[k].pi)) + 1e-6)
+            pg_loss[k] = pg_loss[k] - ent_coef * entropy[k] + 1e-6
+            vf_loss.append(tf.reduce_mean(mse(tf.squeeze(train_model[k].vf), R[k])) + 1e-6)
+            train_loss.append(pg_loss[k] + vf_coef * vf_loss[k] + 1e-6)
 
-            pg_fisher_loss.append(-tf.reduce_mean(logpac))
+            pg_fisher_loss.append(-tf.reduce_mean(logpac) + 1e-6)
             sample_net.append(train_model[k].vf + tf.random_normal(tf.shape(train_model[k].vf)))
             vf_fisher_loss.append(-vf_fisher_coef * tf.reduce_mean(
-                tf.pow(train_model[k].vf - tf.stop_gradient(sample_net[k]), 2)))
-            joint_fisher_loss.append(pg_fisher_loss[k] + vf_fisher_loss[k])
+                tf.pow(train_model[k].vf - tf.stop_gradient(sample_net[k]), 2)) + 1e-6)
+            joint_fisher_loss.append(pg_fisher_loss[k] + vf_fisher_loss[k] + 1e-6)
 
         self.policy_params = []
         self.value_params = []
@@ -182,17 +182,15 @@ class Model(object):
                     action_v = []
                     for j in range(k, pointer[k]):
                         action_v.append(np.concatenate([multionehot(actions[i], self.n_actions[i])
-                                                   for i in range(num_agents) if i != k], axis=1))
+                                                        for i in range(num_agents) if i != k], axis=1))
                     action_v = np.concatenate(action_v, axis=0)
                     new_map.update({train_model[k].A_v: action_v})
-                    td_map.update({train_model[k].A_v: action_v})
-
                 new_map.update({
                     train_model[k].X: np.concatenate([obs[j] for j in range(k, pointer[k])], axis=0),
                     train_model[k].X_v: np.concatenate([ob.copy() for j in range(k, pointer[k])], axis=0),
                     A[k]: np.concatenate([actions[j] for j in range(k, pointer[k])], axis=0),
-                    ADV[k]: np.concatenate([advs[j] for j in range(k, pointer[k])], axis=0),
-                    R[k]: np.concatenate([rewards[j] for j in range(k, pointer[k])], axis=0),
+                    ADV[k]: np.concatenate([advs[j] for j in range(k, pointer[k])], axis=0),  # THIS IS NAN
+                    R[k]: np.concatenate([rewards[j] for j in range(k, pointer[k])], axis=0),  # THIS IS NAN
                     PG_LR[k]: cur_lr / float(scale[k])
                 })
                 sess.run(train_ops[k], feed_dict=new_map)
@@ -202,6 +200,9 @@ class Model(object):
                     td_map[train_model[k].S] = states
                     td_map[train_model[k].M] = masks
 
+            print("pg_loss", pg_loss)
+            print("vf_loss", vf_loss)
+            print("TD MAP", td_map)
             policy_loss, value_loss, policy_entropy = sess.run(
                 [pg_loss, vf_loss, entropy],
                 td_map
@@ -224,6 +225,7 @@ class Model(object):
                 td_map.update(new_map)
 
             lld_loss = sess.run([lld], td_map)
+            print("LLD LOSS", lld_loss)
             return lld_loss
 
         def get_log_action_prob(obs, actions):
@@ -273,14 +275,29 @@ class Model(object):
 
         def step(ob, av, *_args, **_kwargs):
             a, v, s = [], [], []
+
+            for nested in range(len(ob)):
+                for p_value in range(len(ob[nested])):
+                    for l_value in range(len(ob[nested][p_value])):
+                        if ob[nested][p_value][l_value] == None:
+                            ob[nested][p_value][l_value] = 0.0
+
             obs = np.concatenate(ob, axis=1)
+            # obs = [[0.0 if ab == None else ab for ab in nested] for nested in obs]
+
+
             for k in range(num_agents):
-                a_v = np.concatenate([multionehot(av[i], self.n_actions[i])
+                for i in range(num_agents):
+                    if i != k:
+                        a_v = np.concatenate([multionehot(av[i], self.n_actions[i])
                                       for i in range(num_agents) if i != k], axis=1)
-                a_, v_, s_ = step_model[k].step(ob[k], obs, a_v)
+
+                a_, v_, s_ = step_model[k].step(ob[k], obs, a_v)  # NAN comes into v here
                 a.append(a_)
                 v.append(v_)
                 s.append(s_)
+
+            # assert 1 == 2
             return a, v, s
 
         self.step = step
@@ -315,7 +332,7 @@ class Runner(object):
         self.obs = [
             np.zeros((nenv, nstack * env.observation_space[k])) for k in range(self.num_agents)
         ]
-        self.actions = [np.zeros((nenv, )) for _ in range(self.num_agents)]
+        self.actions = [np.zeros((nenv,)) for _ in range(self.num_agents)]
         obs = env.reset()
         self.update_obs(obs)
         self.gamma = gamma
@@ -348,7 +365,7 @@ class Runner(object):
         mb_masks = [[] for _ in range(self.num_agents)]
         mb_states = self.states
         for n in range(self.nsteps):
-            actions, values, states = self.model.step(self.obs, self.actions)
+            actions, values, states = self.model.step(self.obs, self.actions)  # still NAN from here....
             self.actions = actions
             for k in range(self.num_agents):
                 mb_obs[k].append(np.copy(self.obs[k]))
@@ -358,7 +375,13 @@ class Runner(object):
             actions_list = []
             for i in range(self.nenv):
                 actions_list.append([onehot(actions[k][i], self.n_actions[k]) for k in range(self.num_agents)])
+
             obs, true_rewards, dones, _ = self.env.step(actions_list)
+            for nested in range(len(obs)):
+                for p_value in range(len(obs[nested])):
+                    for l_value in range(len(obs[nested][p_value])):
+                        if obs[nested][p_value][l_value] == None:
+                            obs[nested][p_value][l_value] = 0.0
 
             for k in range(self.num_agents):
                 for ni, done in enumerate(dones[k]):
@@ -378,31 +401,35 @@ class Runner(object):
                 rewards = []
                 report_rewards = []
                 for k in range(self.num_agents):
-
                     rewards.append(np.squeeze(self.discriminator[k].get_reward(re_obs[k],
-                                                                               multionehot(re_actions[k], self.n_actions[k]),
+                                                                               multionehot(re_actions[k],
+                                                                                           self.n_actions[k]),
                                                                                re_obs_next[k],
                                                                                re_path_prob[k],
-                                                                               discrim_score=False))) # For competitive tasks, log(D) - log(1-D) empirically works better (discrim_score=True)
+                                                                               discrim_score=False)))  # For competitive tasks, log(D) - log(1-D) empirically works better (discrim_score=True)
                     report_rewards.append(np.squeeze(self.discriminator[k].get_reward(re_obs[k],
-                                                                               multionehot(re_actions[k], self.n_actions[k]),
-                                                                               re_obs_next[k],
-                                                                               re_path_prob[k],
-                                                                               discrim_score=False)))
+                                                                                      multionehot(re_actions[k],
+                                                                                                  self.n_actions[k]),
+                                                                                      re_obs_next[k],
+                                                                                      re_path_prob[k],
+                                                                                      discrim_score=False)))
             elif self.disc_type == 'decentralized-all':
                 rewards = []
                 report_rewards = []
                 for k in range(self.num_agents):
                     rewards.append(np.squeeze(self.discriminator[k].get_reward(np.concatenate(re_obs, axis=1),
-                                                                               np.concatenate(re_actions_onehot, axis=1),
+                                                                               np.concatenate(re_actions_onehot,
+                                                                                              axis=1),
                                                                                np.concatenate(re_obs_next, axis=1),
                                                                                re_path_prob[k],
-                                                                               discrim_score=False))) # For competitive tasks, log(D) - log(1-D) empirically works better (discrim_score=True)
+                                                                               discrim_score=False)))  # For competitive tasks, log(D) - log(1-D) empirically works better (discrim_score=True)
                     report_rewards.append(np.squeeze(self.discriminator[k].get_reward(np.concatenate(re_obs, axis=1),
-                                                                               np.concatenate(re_actions_onehot, axis=1),
-                                                                               np.concatenate(re_obs_next, axis=1),
-                                                                               re_path_prob[k],
-                                                                               discrim_score=False)))
+                                                                                      np.concatenate(re_actions_onehot,
+                                                                                                     axis=1),
+                                                                                      np.concatenate(re_obs_next,
+                                                                                                     axis=1),
+                                                                                      re_path_prob[k],
+                                                                                      discrim_score=False)))
             else:
                 assert False
 
@@ -438,7 +465,8 @@ class Runner(object):
         last_values = self.model.value(self.obs, self.actions)
         # discount/bootstrap off value fn
         for k in range(self.num_agents):
-            for n, (rewards, report_rewards, true_rewards, dones, value) in enumerate(zip(mb_rewards[k], mb_report_rewards[k], mb_true_rewards[k], mb_dones[k], last_values[k].tolist())):
+            for n, (rewards, report_rewards, true_rewards, dones, value) in enumerate(
+                    zip(mb_rewards[k], mb_report_rewards[k], mb_true_rewards[k], mb_dones[k], last_values[k].tolist())):
                 rewards = rewards.tolist()
                 report_rewards = report_rewards.tolist()
                 dones = dones.tolist()
@@ -470,25 +498,25 @@ class Runner(object):
             return mb_obs, mb_obs_next, mb_states, mb_returns, mb_report_returns, mb_masks, mb_actions, \
                    mb_values, mb_all_obs, mb_all_nobs, mh_actions, mh_all_actions, mb_rewards, mb_true_rewards, mb_true_returns
         else:
-            return mb_obs, mb_states, mb_returns, mb_report_returns, mb_masks, mb_actions,\
+            return mb_obs, mb_states, mb_returns, mb_report_returns, mb_masks, mb_actions, \
                    mb_values, mb_all_obs, mh_actions, mh_all_actions, mb_rewards, mb_true_rewards, mb_true_returns
 
 
 def convert_to_one_hot(actions):
     actions_code = {'turnleft': [0, 0, 0, 0],
-               'turnright': [0, 0, 0, 1],
-               'up': [0, 0, 1, 0],
-               'down': [0, 0, 1, 1],
-               'left': [0, 1, 0, 0],
-               'right': [0, 1, 0, 1],
-               'upleft': [0, 1, 1, 0],
-               'upright': [0, 1, 1, 1],
-               'downleft': [1, 0, 0, 0],
-               'downright': [1, 0, 0, 1],
-               'stop':  [1, 0, 1, 0],
-               'noforce': [1, 0, 1, 1],
-               'attach': [1, 1, 0, 0],
-               'detach': [1, 1, 0, 1]}
+                    'turnright': [0, 0, 0, 1],
+                    'up': [0, 0, 1, 0],
+                    'down': [0, 0, 1, 1],
+                    'left': [0, 1, 0, 0],
+                    'right': [0, 1, 0, 1],
+                    'upleft': [0, 1, 1, 0],
+                    'upright': [0, 1, 1, 1],
+                    'downleft': [1, 0, 0, 0],
+                    'downright': [1, 0, 0, 1],
+                    'stop': [1, 0, 1, 0],
+                    'noforce': [1, 0, 1, 1],
+                    'attach': [1, 1, 0, 0],
+                    'detach': [1, 1, 0, 1]}
     one_hot_encoded = []
 
     for action in actions:
@@ -521,7 +549,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
         discriminator = [
             Discriminator(model.sess, ob_space, ac_space,
                           state_only=True, discount=gamma, nstack=nstack, index=k, disc_type=disc_type,
-                          scope="Discriminator_%d" % k, # gp_coef=gp_coef,
+                          scope="Discriminator_%d" % k,  # gp_coef=gp_coef,
                           total_steps=total_timesteps // (nprocs * nsteps),
                           lr_rate=dis_lr, l2_loss_ratio=l2) for k in range(num_agents)
         ]
@@ -560,7 +588,7 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
     update_policy_until = 10
 
     for update in range(1, total_timesteps // nbatch + 1):
-        obs, obs_next, states, rewards, report_rewards, masks, actions, values, all_obs, all_nobs,\
+        obs, obs_next, states, rewards, report_rewards, masks, actions, values, all_obs, all_nobs, \
         mh_actions, mh_all_actions, mh_rewards, mh_true_rewards, mh_true_returns = runner.run()
 
         total_loss = np.zeros((num_agents, d_iters))
@@ -654,11 +682,10 @@ def learn(policy, expert, env, env_id, seed, total_timesteps=int(40e6), gamma=0.
                     logger.record_tabular("policy_entropy %d" % k, float(policy_entropy[k]))
                     logger.record_tabular("policy_loss %d" % k, float(policy_loss[k]))
                     logger.record_tabular("value_loss %d" % k, float(value_loss[k]))
-                    print(value_loss[k])
-                    print(policy_loss[k])
-                    print(policy_entropy[k])
+                    print("Value Loss", value_loss[k])
+                    print(" Policy Loss", policy_loss[k])
+                    print("Policy Entropy", policy_entropy[k])
 
-                    assert 1 == 2
                     try:
                         logger.record_tabular('pearson %d' % k, float(
                             pearsonr(report_rewards[k].flatten(), mh_true_returns[k].flatten())[0]))

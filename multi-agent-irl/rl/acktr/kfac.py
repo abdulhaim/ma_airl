@@ -576,6 +576,7 @@ class KfacOptimizer():
             with tf.control_dependencies([]):
                 for stats_var in stats_eigen:
                     if stats_var not in computedEigen:
+                        print(stats_var)
                         eigens = tf.self_adjoint_eig(stats_var)
                         e = eigens[0]
                         Q = eigens[1]

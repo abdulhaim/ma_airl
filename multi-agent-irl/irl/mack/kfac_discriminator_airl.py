@@ -27,13 +27,13 @@ class Discriminator(object):
         ob_space = ob_spaces[index]
         ac_space = ac_spaces[index]
         self.ob_shape = ob_space[0] * nstack
-        self.all_ob_shape = sum([58 for obs in ob_spaces]) * nstack
+        self.all_ob_shape = sum([29 for obs in ob_spaces]) * nstack
         try:
             nact = 4
         except:
             nact = 4
         self.ac_shape = nact * nstack
-        self.all_ob_shape = sum([58 for obs in ob_spaces]) * nstack
+        self.all_ob_shape = sum([29 for obs in ob_spaces]) * nstack
         try:
             self.all_ac_shape = sum([4 for ac in ac_spaces]) * nstack
         except:
@@ -78,10 +78,10 @@ class Discriminator(object):
             log_pq = tf.reduce_logsumexp([log_p_tau, log_q_tau], axis=0)
             self.discrim_output = tf.exp(log_p_tau - log_pq)
 
-        self.total_loss = -tf.reduce_mean(self.labels * (log_p_tau - log_pq) + (1 - self.labels) * (log_q_tau - log_pq))
+        self.total_loss = -tf.reduce_mean(self.labels * (log_p_tau - log_pq) + (1 - self.labels) * (log_q_tau - log_pq)) + 1e-6
         self.var_list = self.get_trainable_variables()
         params = find_trainable_variables(self.scope)
-        self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in params]) * self.l2_loss_ratio
+        self.l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in params]) * self.l2_loss_ratio + 1e-6
         self.total_loss += self.l2_loss
 
         grads = tf.gradients(self.total_loss, params)
